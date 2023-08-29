@@ -3,8 +3,6 @@ import {
   getTokenAddress,
   hasValidAllowance,
   increaseAllowance,
-  swapEthToToken,
-  swapTokenToEth,
   swapTokenToToken,
 } from '../utils/queries'
 import { getQuote } from '../pages/api/quote';
@@ -57,6 +55,8 @@ const SwapComponent = () => {
 
   const [srcTokenComp, setSrcTokenComp] = useState()
   const [destTokenComp, setDestTokenComp] = useState()
+  const [route, setRoute] = useState('none')
+  const [protocolFee, setProtocolFee] = useState('0')
 
   const [swapBtnText, setSwapBtnText] = useState(ENTER_AMOUNT)
   const [txPending, setTxPending] = useState(false)
@@ -161,24 +161,32 @@ const SwapComponent = () => {
 
     try {
       if (srcToken === WETH.name && destToken === UNI.name) {
-        const buyAmount = (await getQuote({
+        const result = await getQuote({
           sellToken: WETH.address,
           buyToken: UNI.address,
           sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-        })).buyAmount;
+        });
+        const buyAmount = result.buyAmount
         const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
         setOutputValue(fBuyAmount.toString())
+        setRoute(result.orders[0].source)
+        setProtocolFee(result.protocolFee)
       }
       else if (srcToken === UNI.name && destToken === WETH.name) {
-        const buyAmount = (await getQuote({
+        const result = await getQuote({
           sellToken: UNI.address,
           buyToken: WETH.address,
           sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-        })).buyAmount;
+        });
+        const buyAmount = result.buyAmount
         const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
         setOutputValue(fBuyAmount.toString())
+        setRoute(result.orders[0].source)
+        setProtocolFee(result.protocolFee)
       } else {
         setOutputValue('0')
+        setProtocolFee('0')
+        setRoute('')
       }
     } catch (error) {
       setOutputValue('0')
@@ -194,26 +202,33 @@ const SwapComponent = () => {
 
     try {
       if (destToken === UNI.name && srcToken === WETH.name) {
-        const buyAmount = (await getQuote({
+        const result = await getQuote({
           sellToken: UNI.address,
           buyToken: WETH.address,
           sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-        })).buyAmount;
+        });
+        const buyAmount = result.buyAmount
         const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
         setInputValue(fBuyAmount.toString())
+        setRoute(result.orders[0].source)
+        setProtocolFee(result.protocolFee)
       } else if (destToken === WETH.name && srcToken === UNI.name) {
-        const buyAmount = (await getQuote({
+        const result = await getQuote({
           sellToken: UNI.address,
           buyToken: WETH.address,
           sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-        })).buyAmount;
+        });
+        const buyAmount = result.buyAmount
         const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
         setInputValue(fBuyAmount.toString())
+        setRoute(result.orders[0].source)
+        setProtocolFee(result.protocolFee)
       } else {
         setOutputValue('0')
+        setProtocolFee('0')
+        setRoute('')
       }
     } catch (error) {
-      console.log('error :>> ', error);
       setInputValue('0')
     }
   }
@@ -251,7 +266,6 @@ const SwapComponent = () => {
       </div>
       <div className='relative bg-[#212429] p-4 py-6 rounded-xl mb-2 border-[2px] border-transparent hover:border-zinc-600'>
         {srcTokenComp}
-
         <ArrowSmDownIcon
           className='absolute left-1/2 -translate-x-1/2 -bottom-6 h-10 p-1 bg-[#212429] border-4 border-zinc-900 text-zinc-300 rounded-xl cursor-pointer hover:scale-110'
           onClick={handleReverseExchange}
@@ -260,6 +274,21 @@ const SwapComponent = () => {
 
       <div className='bg-[#212429] p-4 py-6 rounded-xl mt-2 border-[2px] border-transparent hover:border-zinc-600'>
         {destTokenComp}
+      </div>
+
+      <div className='bg-[#212429] p-4 py-6 rounded-xl mt-2 border-[2px] border-transparent hover:border-zinc-600'>
+        <div className="flex justify-between">
+          <div className="text-sm text-zinc-300">
+            <p>Transaction type</p>
+            <p>Route</p>
+            <p>Fee</p>
+          </div>
+          <div className="text-sm text-right">
+            <strong>Standard</strong>
+            <p>{route}</p>
+            <p>{protocolFee} ETH</p>
+          </div>
+        </div>
       </div>
 
       <button

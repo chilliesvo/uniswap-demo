@@ -17,7 +17,7 @@ const NavItems = () => {
       >
         {SWAP}
       </p>
-      <p
+      {/* <p
         className={getNavIconClassName(POOL)}
         onClick={() => setSelectedNavItem(POOL)}
       >
@@ -28,7 +28,7 @@ const NavItems = () => {
         onClick={() => setSelectedNavItem(VOTE)}
       >
         {VOTE}
-      </p>
+      </p> */}
       <p
         className={getNavIconClassName(CHART)}
         onClick={() => window.open('https://info.uniswap.org/#/', '_blank')}
