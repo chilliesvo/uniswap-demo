@@ -21,7 +21,8 @@ import { roundNumber } from '../utils/format';
 
 const SwapComponent = () => {
   const [srcToken, setSrcToken] = useState(WETH.name)
-  const [destToken, setDestToken] = useState(DEFAULT_VALUE)
+  // const [destToken, setDestToken] = useState(DEFAULT_VALUE)
+  const [destToken, setDestToken] = useState(UNI.name)
 
   const [inputValue, setInputValue] = useState()
   const [outputValue, setOutputValue] = useState()
