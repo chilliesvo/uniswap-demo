@@ -59,7 +59,7 @@ export async function swapTokenToToken(srcToken, destToken, sellAmount, allowanc
       to,
       swapData,
       {
-        value: sellAmount,
+        value: srcToken.toLowerCase() === WETH.address.toLowerCase() ? sellAmount : 0,
       }
     )
 
