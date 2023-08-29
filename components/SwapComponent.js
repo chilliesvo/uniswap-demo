@@ -17,6 +17,7 @@ import toast, { Toaster } from 'react-hot-toast'
 import { DEFAULT_VALUE, ETH, UNI, WETH } from '../utils/SupportedCoins'
 import { useAccount } from 'wagmi'
 import { formatUnits } from 'ethers/lib/utils';
+import { roundNumber } from '../utils/format';
 
 const SwapComponent = () => {
   const [srcToken, setSrcToken] = useState(WETH.name)
@@ -157,30 +158,28 @@ const SwapComponent = () => {
       inputValue === '0'
     ) return
 
-    let outValue;
     try {
-      switch (true) {
-        case srcToken === WETH.name && destToken === UNI.name:
-          outValue = (await getQuote({
-            sellToken: WETH.address,
-            buyToken: UNI.address,
-            sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-          })).buyAmount;
-          setOutputValue(formatUnits(outValue))
-          break
-        case srcToken === UNI.name && destToken === WETH.name:
-          outValue = (await getQuote({
-            sellToken: UNI.address,
-            buyToken: WETH.address,
-            sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-          })).buyAmount;
-          setOutputValue(formatUnits(outValue))
-          break
-        default:
-          setOutputValue('0')
+      if (srcToken === WETH.name && destToken === UNI.name) {
+        const buyAmount = (await getQuote({
+          sellToken: WETH.address,
+          buyToken: UNI.address,
+          sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
+        })).buyAmount;
+        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
+        setOutputValue(fBuyAmount.toString())
+      }
+      else if (srcToken === UNI.name && destToken === WETH.name) {
+        const buyAmount = (await getQuote({
+          sellToken: UNI.address,
+          buyToken: WETH.address,
+          sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
+        })).buyAmount;
+        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
+        setOutputValue(fBuyAmount.toString())
+      } else {
+        setOutputValue('0')
       }
     } catch (error) {
-      console.log('error :>> ', error);
       setOutputValue('0')
     }
   }
@@ -192,28 +191,25 @@ const SwapComponent = () => {
       outputValue === '0'
     ) return
 
-    let outValue;
     try {
-      switch (true) {
-        case destToken === UNI.name && srcToken === WETH.name:
-          outValue = (await getQuote({
-            sellToken: UNI.address,
-            buyToken: WETH.address,
-            sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-          })).buyAmount;
-
-          setInputValue(formatUnits(outValue))
-          break
-        case destToken === WETH.name && srcToken === UNI.name:
-          outValue = (await getQuote({
-            sellToken: UNI.address,
-            buyToken: WETH.address,
-            sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-          })).buyAmount;
-          setInputValue(formatUnits(outValue))
-          break
-        default:
-          setOutputValue('0')
+      if (destToken === UNI.name && srcToken === WETH.name) {
+        const buyAmount = (await getQuote({
+          sellToken: UNI.address,
+          buyToken: WETH.address,
+          sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
+        })).buyAmount;
+        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
+        setInputValue(fBuyAmount.toString())
+      } else if (destToken === WETH.name && srcToken === UNI.name) {
+        const buyAmount = (await getQuote({
+          sellToken: UNI.address,
+          buyToken: WETH.address,
+          sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
+        })).buyAmount;
+        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
+        setInputValue(fBuyAmount.toString())
+      } else {
+        setOutputValue('0')
       }
     } catch (error) {
       console.log('error :>> ', error);

@@ -7,6 +7,7 @@ import {
 import { ethers } from 'ethers'
 import TransactionStatus from './TransactionStatus'
 import toast, { Toaster } from 'react-hot-toast'
+import { roundNumber } from '../utils/format'
 
 import {
   ClipboardIcon,
@@ -34,8 +35,7 @@ const TokenBalance = ({ name, walletAddress }) => {
 
   async function fetchTokenBalance() {
     const bal = await getTokenBalance(name, walletAddress)
-
-    const fBal = ethers.utils.formatUnits(bal.toString(), 18)
+    const fBal = roundNumber(ethers.utils.formatUnits(bal._hex, 18))
     setBalance(fBal.toString())
   }
 
