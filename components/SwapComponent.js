@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
+  getTokenAddress,
   hasValidAllowance,
   increaseAllowance,
   swapEthToToken,
@@ -14,11 +15,11 @@ import SwapField from './SwapField'
 import TransactionStatus from './TransactionStatus'
 import toast, { Toaster } from 'react-hot-toast'
 import { DEFAULT_VALUE, ETH, UNI, WETH } from '../utils/SupportedCoins'
-import { toEth, toWei } from '../utils/ether-utils'
 import { useAccount } from 'wagmi'
+import { formatUnits } from 'ethers/lib/utils';
 
 const SwapComponent = () => {
-  const [srcToken, setSrcToken] = useState(ETH)
+  const [srcToken, setSrcToken] = useState(WETH.name)
   const [destToken, setDestToken] = useState(DEFAULT_VALUE)
 
   const [inputValue, setInputValue] = useState()
@@ -61,10 +62,6 @@ const SwapComponent = () => {
   const notifyError = msg => toast.error(msg, { duration: 6000 })
   const notifySuccess = () => toast.success('Transaction completed.')
 
-  const formatUnits = (value) => {
-    return Math.round(ethers.utils.formatUnits(value, 18) * 100000) / 100000;
-  };
-
   const { address } = useAccount()
 
   useEffect(() => {
@@ -105,7 +102,7 @@ const SwapComponent = () => {
   }, [outputValue, srcToken])
 
   async function handleSwap() {
-    if (srcToken === ETH && destToken !== ETH) {
+    if (srcToken === ETH.name && destToken !== ETH.name) {
       performSwap()
     } else {
       // Check whether there is allowance when the swap deals with tokenToEth/tokenToToken
@@ -163,20 +160,20 @@ const SwapComponent = () => {
     let outValue;
     try {
       switch (true) {
-        case srcToken === WETH && destToken === UNI:
+        case srcToken === WETH.name && destToken === UNI.name:
           outValue = (await getQuote({
-            sellToken: process.env.NEXT_PUBLIC_WETH_TOKEN,
-            buyToken: process.env.NEXT_PUBLIC_UNI_TOKEN,
+            sellToken: WETH.address,
+            buyToken: UNI.address,
             sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-          })).data.buyAmount;
+          })).buyAmount;
           setOutputValue(formatUnits(outValue))
           break
-        case srcToken === UNI && destToken === WETH:
+        case srcToken === UNI.name && destToken === WETH.name:
           outValue = (await getQuote({
-            sellToken: process.env.NEXT_PUBLIC_UNI_TOKEN,
-            buyToken: process.env.NEXT_PUBLIC_WETH_TOKEN,
+            sellToken: UNI.address,
+            buyToken: WETH.address,
             sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-          })).data.buyAmount;
+          })).buyAmount;
           setOutputValue(formatUnits(outValue))
           break
         default:
@@ -198,21 +195,21 @@ const SwapComponent = () => {
     let outValue;
     try {
       switch (true) {
-        case destToken === UNI && srcToken === WETH:
+        case destToken === UNI.name && srcToken === WETH.name:
           outValue = (await getQuote({
-            sellToken: process.env.NEXT_PUBLIC_UNI_TOKEN,
-            buyToken: process.env.NEXT_PUBLIC_WETH_TOKEN,
+            sellToken: UNI.address,
+            buyToken: WETH.address,
             sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-          })).data.buyAmount;
+          })).buyAmount;
 
           setInputValue(formatUnits(outValue))
           break
-        case destToken === WETH && srcToken === UNI:
+        case destToken === WETH.name && srcToken === UNI.name:
           outValue = (await getQuote({
-            sellToken: process.env.NEXT_PUBLIC_UNI_TOKEN,
-            buyToken: process.env.NEXT_PUBLIC_WETH_TOKEN,
+            sellToken: UNI.address,
+            buyToken: WETH.address,
             sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-          })).data.buyAmount;
+          })).buyAmount;
           setInputValue(formatUnits(outValue))
           break
         default:
@@ -228,13 +225,13 @@ const SwapComponent = () => {
     setTxPending(true)
 
     let receipt
-
-    if (srcToken === ETH && destToken !== ETH)
-      receipt = await swapEthToToken(destToken, inputValue)
-    else if (srcToken !== ETH && destToken === ETH)
-      receipt = await swapTokenToEth(srcToken, inputValue)
-    else receipt = await swapTokenToToken(srcToken, destToken, inputValue)
-
+    const quote = await getQuote({
+      sellToken: getTokenAddress(srcToken),
+      buyToken: getTokenAddress(destToken),
+      sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
+    })
+    const { sellTokenAddress, buyTokenAddress, sellAmount, allowanceTarget, to, data: swapData } = quote
+    receipt = await swapTokenToToken(sellTokenAddress, buyTokenAddress, sellAmount, allowanceTarget, to, swapData)
     setTxPending(false)
 
     if (receipt && !receipt.hasOwnProperty('transactionHash'))
