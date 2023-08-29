@@ -1,14 +1,13 @@
 import { BigNumber, ethers } from 'ethers'
-import { contract, tokenContract } from './contract'
-import { toEth } from './ether-utils'
+import { dexContract, tokenContract } from './contract'
 import { UNI, WETH } from './SupportedCoins'
-import ERC20 from '../ABI/ERC20.json'
+import ERC20ABI from '../ABI/ERC20.json'
 
 export async function swapEthToToken(tokenName, amount) {
   try {
     let tx = { value: toWei(amount) }
 
-    const contractObj = await contract()
+    const contractObj = await dexContract()
     const data = await contractObj.swapEthToToken(tokenName, tx)
 
     const receipt = await data.wait()
@@ -20,15 +19,13 @@ export async function swapEthToToken(tokenName, amount) {
 
 export async function hasValidAllowance(owner, tokenName, amount) {
   try {
-    const contractObj = await contract()
-    const address = await contractObj.getTokenAddress(tokenName)
+    const address = getTokenAddress(tokenName)
 
     const tokenContractObj = await tokenContract(address)
     const data = await tokenContractObj.allowance(
       owner,
       process.env.NEXT_PUBLIC_SIMPLE_SWAP,
     )
-
     const result = BigNumber.from(data.toString()).gte(
       BigNumber.from(toWei(amount)),
     )
@@ -41,7 +38,7 @@ export async function hasValidAllowance(owner, tokenName, amount) {
 
 export async function swapTokenToEth(tokenName, amount) {
   try {
-    const contractObj = await contract()
+    const contractObj = await dexContract()
     const data = await contractObj.swapTokenToEth(tokenName, toWei(amount))
 
     const receipt = await data.wait()
@@ -51,13 +48,19 @@ export async function swapTokenToEth(tokenName, amount) {
   }
 }
 
-export async function swapTokenToToken(srcToken, destToken, amount) {
+export async function swapTokenToToken(srcToken, destToken, sellAmount, allowanceTarget, to, swapData) {
   try {
-    const contractObj = await contract()
-    const data = await contractObj.swapTokenToToken(
+    const contractObj = await dexContract()
+    const data = await contractObj.fillQuote(
       srcToken,
       destToken,
-      toWei(amount),
+      sellAmount,
+      allowanceTarget,
+      to,
+      swapData,
+      {
+        value: sellAmount,
+      }
     )
 
     const receipt = await data.wait()
@@ -69,16 +72,16 @@ export async function swapTokenToToken(srcToken, destToken, amount) {
 
 export async function getTokenBalance(tokenName, address) {
   const provider = new ethers.providers.Web3Provider(window.ethereum)
-  const contract = new ethers.Contract(getTokenAddress(tokenName), ERC20, provider);
+  const contract = new ethers.Contract(getTokenAddress(tokenName), ERC20ABI, provider);
   return contract.balanceOf(address);
 }
 
 export function getTokenAddress(tokenName) {
   switch (tokenName) {
-    case WETH:
-      return process.env.NEXT_PUBLIC_WETH_TOKEN
-    case UNI:
-      return process.env.NEXT_PUBLIC_UNI_TOKEN
+    case WETH.name:
+      return WETH.address
+    case UNI.name:
+      return UNI.address
     default:
       return undefined
   }
@@ -86,12 +89,10 @@ export function getTokenAddress(tokenName) {
 
 export async function increaseAllowance(tokenName, amount) {
   try {
-    const contractObj = await contract()
-    const address = await contractObj.getTokenAddress(tokenName)
-
+    const address = getTokenAddress(tokenName)
     const tokenContractObj = await tokenContract(address)
     const data = await tokenContractObj.approve(
-      process.env.SIMPLE_SWAP,
+      process.env.NEXT_PUBLIC_SIMPLE_SWAP,
       toWei(amount),
     )
 

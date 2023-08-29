@@ -9,8 +9,8 @@ import {
 
 const Selector = ({ defaultValue, ignoreValue, setToken, id }) => {
   const menu = [
-    { key: WETH, name: WETH },
-    { key: UNI, name: UNI },
+    { key: WETH.name, name: WETH.name },
+    { key: UNI.name, name: UNI.name },
   ]
 
   const [selectedItem, setSelectedItem] = useState()

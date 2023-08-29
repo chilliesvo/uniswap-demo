@@ -1,6 +1,6 @@
 import { ethers } from 'ethers'
 import SimpleTokenSwap from '../ABI/SimpleTokenSwap.json'
-import ERC20 from '../ABI/ERC20.json'
+import ERC20ABI from '../ABI/ERC20.json'
 
 export const tokenContract = async address => {
   const provider = new ethers.providers.Web3Provider(window.ethereum)
@@ -8,14 +8,12 @@ export const tokenContract = async address => {
 
   if (ethereum) {
     const signer = provider.getSigner()
-
-    const contractReader = new ethers.Contract(address, ERC20, signer)
-
+    const contractReader = new ethers.Contract(address, ERC20ABI, signer)
     return contractReader
   }
 }
 
-export const contract = async () => {
+export const dexContract = async () => {
   const provider = new ethers.providers.Web3Provider(window.ethereum)
   const { ethereum } = window
 

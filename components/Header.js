@@ -17,8 +17,8 @@ const Header = () => {
   useEffect(() => {
     setTokenBalComp(
       <>
-        <TokenBalance name={WETH} walletAddress={address} />
-        <TokenBalance name={UNI} walletAddress={address} />
+        <TokenBalance name={WETH.name} walletAddress={address} />
+        <TokenBalance name={UNI.name} walletAddress={address} />
       </>,
     )
 
