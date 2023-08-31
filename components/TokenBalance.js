@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
-  getTokenAddress,
   getTokenBalance,
   increaseAllowance,
 } from '../utils/queries'
@@ -8,6 +7,7 @@ import { ethers } from 'ethers'
 import TransactionStatus from './TransactionStatus'
 import toast, { Toaster } from 'react-hot-toast'
 import { roundNumber } from '../utils/format'
+import { getTokenAddress } from '../utils/SupportedCoins'
 
 import {
   ClipboardIcon,
@@ -39,8 +39,8 @@ const TokenBalance = ({ name, walletAddress }) => {
     setBalance(fBal.toString())
   }
 
-  async function fetchTokenAddress() {
-    const address = await getTokenAddress(name)
+  function fetchTokenAddress() {
+    const address = getTokenAddress(name)
     setTokenAddress(address)
   }
 

@@ -1,6 +1,6 @@
 import { BigNumber, ethers } from 'ethers'
 import { dexContract, tokenContract } from './contract'
-import { UNI, WETH } from './SupportedCoins'
+import { UNI, WETH, getTokenAddress } from './SupportedCoins'
 import ERC20ABI from '../ABI/ERC20.json'
 
 export async function swapEthToToken(tokenName, amount) {
@@ -48,18 +48,18 @@ export async function swapTokenToEth(tokenName, amount) {
   }
 }
 
-export async function swapTokenToToken(srcToken, destToken, sellAmount, allowanceTarget, to, swapData) {
+export async function swapTokenToToken(srcToken, destToken, sellAmount, parsedSellAmount, allowanceTarget, to, swapData) {
   try {
     const contractObj = await dexContract()
     const data = await contractObj.fillQuote(
       srcToken,
       destToken,
-      sellAmount,
+      parsedSellAmount,
       allowanceTarget,
       to,
       swapData,
       {
-        value: srcToken.toLowerCase() === WETH.address.toLowerCase() ? sellAmount : 0,
+        value: srcToken.toLowerCase() === WETH.address.toLowerCase() ? ethers.utils.parseEther(sellAmount.toString()) : 0,
       }
     )
 
@@ -74,17 +74,6 @@ export async function getTokenBalance(tokenName, address) {
   const provider = new ethers.providers.Web3Provider(window.ethereum)
   const contract = new ethers.Contract(getTokenAddress(tokenName), ERC20ABI, provider);
   return contract.balanceOf(address);
-}
-
-export function getTokenAddress(tokenName) {
-  switch (tokenName) {
-    case WETH.name:
-      return WETH.address
-    case UNI.name:
-      return UNI.address
-    default:
-      return undefined
-  }
 }
 
 export async function increaseAllowance(tokenName, amount) {

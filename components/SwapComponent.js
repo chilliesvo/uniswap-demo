@@ -1,21 +1,24 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
-  getTokenAddress,
   hasValidAllowance,
   increaseAllowance,
   swapTokenToToken,
 } from '../utils/queries'
 import { getQuote } from '../pages/api/quote';
 import { ethers } from 'ethers';
+import { debounce } from 'lodash';
 
 import { CogIcon, ArrowSmDownIcon } from '@heroicons/react/outline'
 import SwapField from './SwapField'
 import TransactionStatus from './TransactionStatus'
 import toast, { Toaster } from 'react-hot-toast'
-import { DEFAULT_VALUE, ETH, UNI, WETH } from '../utils/SupportedCoins'
+import { DEFAULT_VALUE, ETH, UNI, WETH, getTokenAddress } from '../utils/SupportedCoins'
 import { useAccount } from 'wagmi'
 import { formatUnits } from 'ethers/lib/utils';
 import { roundNumber } from '../utils/format';
+import Setting from './Setting';
+import TransactionType from './TransactionType';
+import { OX_API, STANDARD } from '../utils/SupportedTransactions';
 
 const SwapComponent = () => {
   const [srcToken, setSrcToken] = useState(WETH.name)
@@ -24,6 +27,26 @@ const SwapComponent = () => {
 
   const [inputValue, setInputValue] = useState()
   const [outputValue, setOutputValue] = useState()
+
+  const getOutput = async (srcToken, destToken, value, isSetOutput) => {
+    try {
+      const srcAddress = getTokenAddress(srcToken)
+      const destAddress = getTokenAddress(destToken)
+      const quote = await getQuote(srcAddress, destAddress, value);
+      const buyAmount = quote.buyAmount
+      const fBuyAmount = roundNumber(formatUnits(buyAmount, 18)).toString()
+      isSetOutput ? setOutputValue(fBuyAmount) : setInputValue(fBuyAmount);
+      setRoute(getRoute(quote));
+      // setProtocolFee(quote.protocolFee)
+    } catch (error) {
+      console.log('error', error);
+      setOutputValue('0')
+      // setProtocolFee('0')
+      setRoute('.')
+    }
+  };
+
+  const debouncedGetOutput = debounce(getOutput, 500);
 
   const inputValueRef = useRef()
   const outputValueRef = useRef()
@@ -55,14 +78,15 @@ const SwapComponent = () => {
 
   const [srcTokenComp, setSrcTokenComp] = useState()
   const [destTokenComp, setDestTokenComp] = useState()
-  const [route, setRoute] = useState('none')
-  const [protocolFee, setProtocolFee] = useState('0')
+  const [route, setRoute] = useState('.')
+  // const [protocolFee, setProtocolFee] = useState('0')
 
   const [swapBtnText, setSwapBtnText] = useState(ENTER_AMOUNT)
   const [txPending, setTxPending] = useState(false)
 
   const notifyError = msg => toast.error(msg, { duration: 6000 })
   const notifySuccess = () => toast.success('Transaction completed.')
+  const getRoute = (quote) => quote.orders[0].source.replace("_", " ")
 
   const { address } = useAccount()
 
@@ -159,38 +183,7 @@ const SwapComponent = () => {
       inputValue === '0'
     ) return
 
-    try {
-      if (srcToken === WETH.name && destToken === UNI.name) {
-        const result = await getQuote({
-          sellToken: WETH.address,
-          buyToken: UNI.address,
-          sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-        });
-        const buyAmount = result.buyAmount
-        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
-        setOutputValue(fBuyAmount.toString())
-        setRoute(result.orders[0].source)
-        setProtocolFee(result.protocolFee)
-      }
-      else if (srcToken === UNI.name && destToken === WETH.name) {
-        const result = await getQuote({
-          sellToken: UNI.address,
-          buyToken: WETH.address,
-          sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-        });
-        const buyAmount = result.buyAmount
-        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
-        setOutputValue(fBuyAmount.toString())
-        setRoute(result.orders[0].source)
-        setProtocolFee(result.protocolFee)
-      } else {
-        setOutputValue('0')
-        setProtocolFee('0')
-        setRoute('')
-      }
-    } catch (error) {
-      setOutputValue('0')
-    }
+    debouncedGetOutput(srcToken, destToken, inputValue, true)
   }
 
   async function populateInputValue() {
@@ -200,55 +193,28 @@ const SwapComponent = () => {
       outputValue === '0'
     ) return
 
-    try {
-      if (destToken === UNI.name && srcToken === WETH.name) {
-        const result = await getQuote({
-          sellToken: UNI.address,
-          buyToken: WETH.address,
-          sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-        });
-        const buyAmount = result.buyAmount
-        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
-        setInputValue(fBuyAmount.toString())
-        setRoute(result.orders[0].source)
-        setProtocolFee(result.protocolFee)
-      } else if (destToken === WETH.name && srcToken === UNI.name) {
-        const result = await getQuote({
-          sellToken: UNI.address,
-          buyToken: WETH.address,
-          sellAmount: ethers.utils.parseUnits(outputValue.toString(), 18),
-        });
-        const buyAmount = result.buyAmount
-        const fBuyAmount = roundNumber(formatUnits(buyAmount, 18))
-        setInputValue(fBuyAmount.toString())
-        setRoute(result.orders[0].source)
-        setProtocolFee(result.protocolFee)
-      } else {
-        setOutputValue('0')
-        setProtocolFee('0')
-        setRoute('')
-      }
-    } catch (error) {
-      setInputValue('0')
-    }
+    debouncedGetOutput(destToken, srcToken, outputValue, false)
   }
 
   async function performSwap() {
     setTxPending(true)
 
     let receipt
-    const quote = await getQuote({
-      sellToken: getTokenAddress(srcToken),
-      buyToken: getTokenAddress(destToken),
-      sellAmount: ethers.utils.parseUnits(inputValue.toString(), 18),
-    })
-    const { sellTokenAddress, buyTokenAddress, sellAmount, allowanceTarget, to, data: swapData } = quote
-    receipt = await swapTokenToToken(sellTokenAddress, buyTokenAddress, sellAmount, allowanceTarget, to, swapData)
+    const quote = await getQuote(
+      getTokenAddress(srcToken),
+      getTokenAddress(destToken),
+      inputValue,
+    )
+    const { sellTokenAddress, buyTokenAddress, sellAmount: parsedSellAmount, allowanceTarget, to, data: swapData } = quote
+    receipt = await swapTokenToToken(sellTokenAddress, buyTokenAddress, inputValue, parsedSellAmount, allowanceTarget, to, swapData)
     setTxPending(false)
 
-    if (receipt && !receipt.hasOwnProperty('transactionHash'))
+    if (receipt && !receipt.hasOwnProperty('transactionHash')) {
       notifyError(receipt)
-    else notifySuccess()
+    } else {
+      window.location.reload()
+      notifySuccess()
+    }
   }
 
   function handleInsufficientAllowance() {
@@ -262,7 +228,9 @@ const SwapComponent = () => {
     <div className='bg-zinc-900 w-[35%] p-4 px-6 rounded-xl'>
       <div className='flex items-center justify-between py-4 px-1'>
         <p>Swap</p>
-        <CogIcon className='h-6' />
+        <div className="text-right">
+          {/* <Setting /> */}
+        </div>
       </div>
       <div className='relative bg-[#212429] p-4 py-6 rounded-xl mb-2 border-[2px] border-transparent hover:border-zinc-600'>
         {srcTokenComp}
@@ -278,15 +246,24 @@ const SwapComponent = () => {
 
       <div className='bg-[#212429] p-4 py-6 rounded-xl mt-2 border-[2px] border-transparent hover:border-zinc-600'>
         <div className="flex justify-between">
-          <div className="text-sm text-zinc-300">
+          <div className="text-sm mt-2 ml-2 text-zinc-300">
             <p>Transaction type</p>
-            <p>Route</p>
-            <p>Fee</p>
           </div>
           <div className="text-sm text-right">
-            <strong>Standard</strong>
+            <TransactionType
+              id={STANDARD}
+              defaultValue={STANDARD}
+            />
+          </div>
+        </div>
+        <div className="flex justify-between">
+          <div className="text-sm ml-2 text-zinc-300">
+            <p>Route</p>
+            {/* <p>Fee</p> */}
+          </div>
+          <div className="text-sm mr-2 text-right">
             <p>{route}</p>
-            <p>{protocolFee} ETH</p>
+            {/* <p>{protocolFee} ETH</p> */}
           </div>
         </div>
       </div>

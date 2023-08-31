@@ -1,8 +1,13 @@
 import axios from 'axios';
 import queryString from 'query-string';
+import { ethers } from 'ethers';
 
-export const getQuote = async (params) => {
-    const query = queryString.stringify(params);
+export const getQuote = async (sellToken, buyToken, sellAmount) => {
+    const query = queryString.stringify({
+        sellToken: sellToken,
+        buyToken: buyToken,
+        sellAmount: ethers.utils.parseUnits(sellAmount.toString(), 18),
+    });
     const res = await axios.get('https://goerli.api.0x.org/swap/v1/quote?' + query, {
         headers: {
             "Content-Type": "application/json; charset=UTF-8",
@@ -11,3 +16,5 @@ export const getQuote = async (params) => {
     })
     return res.data
 }
+
+
