@@ -1,13 +1,15 @@
 import { BigNumber, ethers } from 'ethers'
-import { dexContract, tokenContract } from './contract'
+import { simpleSwapContract, tokenContract, uniswapV2Contract } from './contract'
 import { UNI, WETH, getTokenAddress } from './SupportedCoins'
 import ERC20ABI from '../ABI/ERC20.json'
+import { OX_API, STANDARD } from './SupportedTransactions'
+import { ROUTER } from '../pages/api/quote'
 
 export async function swapEthToToken(tokenName, amount) {
   try {
     let tx = { value: toWei(amount) }
 
-    const contractObj = await dexContract()
+    const contractObj = await simpeContract()
     const data = await contractObj.swapEthToToken(tokenName, tx)
 
     const receipt = await data.wait()
@@ -17,14 +19,14 @@ export async function swapEthToToken(tokenName, amount) {
   }
 }
 
-export async function hasValidAllowance(owner, tokenName, amount) {
+export async function hasValidAllowance(owner, tokenName, amount, transactionType) {
   try {
     const address = getTokenAddress(tokenName)
 
     const tokenContractObj = await tokenContract(address)
     const data = await tokenContractObj.allowance(
       owner,
-      process.env.NEXT_PUBLIC_SIMPLE_SWAP,
+      transactionType === STANDARD ? ROUTER.uniswapV202 : process.env.NEXT_PUBLIC_SIMPLE_SWAP,
     )
     const result = BigNumber.from(data.toString()).gte(
       BigNumber.from(toWei(amount)),
@@ -38,7 +40,7 @@ export async function hasValidAllowance(owner, tokenName, amount) {
 
 export async function swapTokenToEth(tokenName, amount) {
   try {
-    const contractObj = await dexContract()
+    const contractObj = await simpeContract()
     const data = await contractObj.swapTokenToEth(tokenName, toWei(amount))
 
     const receipt = await data.wait()
@@ -48,23 +50,41 @@ export async function swapTokenToEth(tokenName, amount) {
   }
 }
 
-export async function swapTokenToToken(srcToken, destToken, sellAmount, parsedSellAmount, allowanceTarget, to, swapData) {
-  try {
-    const contractObj = await dexContract()
-    const data = await contractObj.fillQuote(
-      srcToken,
-      destToken,
-      parsedSellAmount,
-      allowanceTarget,
-      to,
-      swapData,
-      {
-        value: srcToken.toLowerCase() === WETH.address.toLowerCase() ? ethers.utils.parseEther(sellAmount.toString()) : 0,
-      }
-    )
+export async function swapTokenToToken(quote, transactionType, owner) {
+  const { sellTokenAddress, buyTokenAddress, sellAmount, allowanceTarget, to, data: swapData } = quote
 
-    const receipt = await data.wait()
-    return receipt
+  try {
+    if (transactionType === OX_API) {
+      const contractObj = await simpleSwapContract()
+      const data = await contractObj.fillQuote(
+        sellTokenAddress,
+        buyTokenAddress,
+        sellAmount,
+        allowanceTarget,
+        to,
+        swapData,
+        {
+          value: sellTokenAddress.toLowerCase() === WETH.address.toLowerCase() ? sellAmount.toString() : 0,
+        }
+      )
+      const receipt = await data.wait()
+      return receipt
+    } else if (transactionType === STANDARD) {
+
+      const contractObj = await uniswapV2Contract()
+      const amountIn = ethers.utils.parseEther(sellAmount)
+      const amountOut = 0
+      const path = [sellTokenAddress, buyTokenAddress]
+      const to = owner
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 20
+      const params = [amountIn, amountOut, path, to, deadline]
+      const data = await contractObj.swapExactTokensForTokens(...params)
+      const receipt = await data.wait()
+      return receipt
+    } else {
+      return
+    }
+
   } catch (e) {
     return parseErrorMsg(e)
   }
@@ -76,12 +96,12 @@ export async function getTokenBalance(tokenName, address) {
   return contract.balanceOf(address);
 }
 
-export async function increaseAllowance(tokenName, amount) {
+export async function increaseAllowance(tokenName, amount, transactionType) {
   try {
     const address = getTokenAddress(tokenName)
     const tokenContractObj = await tokenContract(address)
     const data = await tokenContractObj.approve(
-      process.env.NEXT_PUBLIC_SIMPLE_SWAP,
+      transactionType === STANDARD ? ROUTER.uniswapV202 : process.env.NEXT_PUBLIC_SIMPLE_SWAP,
       toWei(amount),
     )
 

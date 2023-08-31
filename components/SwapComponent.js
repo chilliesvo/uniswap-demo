@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import {
   hasValidAllowance,
   increaseAllowance,
@@ -17,8 +17,13 @@ import { useAccount } from 'wagmi'
 import { formatUnits } from 'ethers/lib/utils';
 import { roundNumber } from '../utils/format';
 import Setting from './Setting';
-import TransactionType from './TransactionType';
 import { OX_API, STANDARD } from '../utils/SupportedTransactions';
+import { Dropdown } from '@nextui-org/react'
+
+const menuType = [
+  { key: STANDARD, name: STANDARD },
+  { key: OX_API, name: OX_API },
+]
 
 const SwapComponent = () => {
   const [srcToken, setSrcToken] = useState(WETH.name)
@@ -28,15 +33,19 @@ const SwapComponent = () => {
   const [inputValue, setInputValue] = useState()
   const [outputValue, setOutputValue] = useState()
 
-  const getOutput = async (srcToken, destToken, value, isSetOutput) => {
+  const [transactionType, setTransactionType] = useState(OX_API)
+  const [menuTypes, setMenuTypes] = useState(menuType)
+
+  const setOutput = async (srcToken, destToken, value, isSetOutput) => {
     try {
       const srcAddress = getTokenAddress(srcToken)
       const destAddress = getTokenAddress(destToken)
-      const quote = await getQuote(srcAddress, destAddress, value);
+      const quote = await getQuote(srcAddress, destAddress, value, transactionType);
       const buyAmount = quote.buyAmount
       const fBuyAmount = roundNumber(formatUnits(buyAmount, 18)).toString()
       isSetOutput ? setOutputValue(fBuyAmount) : setInputValue(fBuyAmount);
-      setRoute(getRoute(quote));
+      const route = transactionType === STANDARD ? "Uniswap V2" : getRoute(quote)
+      setRoute(route);
       // setProtocolFee(quote.protocolFee)
     } catch (error) {
       console.log('error', error);
@@ -46,7 +55,7 @@ const SwapComponent = () => {
     }
   };
 
-  const debouncedGetOutput = debounce(getOutput, 500);
+  const debouncedGetOutput = useCallback(debounce(setOutput, 800), [transactionType]);
 
   const inputValueRef = useRef()
   const outputValueRef = useRef()
@@ -127,13 +136,17 @@ const SwapComponent = () => {
     if (isReversed.current) isReversed.current = false
   }, [outputValue, srcToken])
 
+  useEffect(() => {
+    setMenuTypes(menuType)
+  }, [])
+
   async function handleSwap() {
     if (srcToken === ETH.name && destToken !== ETH.name) {
       performSwap()
     } else {
       // Check whether there is allowance when the swap deals with tokenToEth/tokenToToken
       setTxPending(true)
-      const result = await hasValidAllowance(address, srcToken, inputValue)
+      const result = await hasValidAllowance(address, srcToken, inputValue, transactionType)
       setTxPending(false)
 
       if (result) performSwap()
@@ -144,7 +157,7 @@ const SwapComponent = () => {
   async function handleIncreaseAllowance() {
     // Increase the allowance
     setTxPending(true)
-    await increaseAllowance(srcToken, inputValue)
+    await increaseAllowance(srcToken, inputValue, transactionType)
     setTxPending(false)
 
     // Set the swapbtn to "Swap" again
@@ -204,9 +217,9 @@ const SwapComponent = () => {
       getTokenAddress(srcToken),
       getTokenAddress(destToken),
       inputValue,
+      transactionType
     )
-    const { sellTokenAddress, buyTokenAddress, sellAmount: parsedSellAmount, allowanceTarget, to, data: swapData } = quote
-    receipt = await swapTokenToToken(sellTokenAddress, buyTokenAddress, inputValue, parsedSellAmount, allowanceTarget, to, swapData)
+    receipt = await swapTokenToToken(quote, transactionType, address)
     setTxPending(false)
 
     if (receipt && !receipt.hasOwnProperty('transactionHash')) {
@@ -250,10 +263,32 @@ const SwapComponent = () => {
             <p>Transaction type</p>
           </div>
           <div className="text-sm text-right">
-            <TransactionType
-              id={STANDARD}
-              defaultValue={STANDARD}
-            />
+            <Dropdown>
+              <Dropdown.Button
+                css={{
+                  backgroundColor: '#222429',
+                }}
+              >
+                {transactionType}
+              </Dropdown.Button>
+              <Dropdown.Menu
+                aria-label='Dynamic Actions'
+                items={menuTypes}
+                onAction={key => {
+                  setTransactionType(key)
+                }}
+              >
+                {item => (
+                  <Dropdown.Item
+                    aria-label={transactionType}
+                    key={item.key}
+                    color={item.key === 'delete' ? 'error' : 'default'}
+                  >
+                    {item.name}
+                  </Dropdown.Item>
+                )}
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
         </div>
         <div className="flex justify-between">
